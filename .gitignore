@@ -5,7 +5,26 @@ __pycache__/
 *.pyd
 *.swp
 .DS_Store
+Thumbs.db
+desktop.ini
 .env
 .env.*
 .idea/
 .vscode/
+
+# Streamlit
+.streamlit/
+
+# Python caches and environments
+.pytest_cache/
+.cache/
+
+# Generated media / output files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.gif
+*.mp3
+*.wav
+*.ogg
