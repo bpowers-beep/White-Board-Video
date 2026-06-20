@@ -1,0 +1,9 @@
+streamlit>=1.32.0
+opencv-python>=4.9.0
+numpy>=1.26.0
+moviepy>=1.0.3
+edge-tts>=6.1.9
+Pillow>=10.2.0
+mutagen>=1.47.0
+imageio>=2.34.0
+imageio-ffmpeg>=0.4.9
