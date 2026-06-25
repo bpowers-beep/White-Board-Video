@@ -984,6 +984,58 @@ def _build_caption_segments(
     return segments
 
 
+def _build_caption_segments_from_original(
+    word_events: list[dict],
+    original_text: str,
+    max_chars: int = 40,
+    max_duration: float = 4.0,
+    max_words: int = 8,
+) -> list[dict]:
+    """
+    Reconstruct caption segments using the original scene `original_text` to
+    preserve punctuation. Maps original word tokens to edge-tts word events by
+    order and keeps the timing from `word_events`.
+    """
+    if not word_events:
+        return []
+
+    import re
+
+    # Tokenize original text into words and punctuation tokens
+    tokens = re.findall(r"\w+|[^\w\s]+", original_text)
+    orig_words = []
+    puncts = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if re.match(r"\w+", tok):
+            word = tok
+            punct = ""
+            if i + 1 < len(tokens) and not re.match(r"\w+", tokens[i + 1]):
+                punct = tokens[i + 1]
+                i += 1
+            orig_words.append(word)
+            puncts.append(punct)
+        i += 1
+
+    # Rebuild word events but replace text with the original word + trailing punctuation
+    new_events = []
+    for idx, ev in enumerate(word_events):
+        text = ev.get("text", "").strip()
+        if idx < len(orig_words):
+            text_repl = orig_words[idx] + (puncts[idx] if puncts[idx] else "")
+        else:
+            text_repl = text
+        new_events.append({
+            "text": text_repl,
+            "start": ev.get("start", 0),
+            "duration": ev.get("duration", 0),
+        })
+
+    # Delegate to the existing segmenting logic
+    return _build_caption_segments(new_events, max_chars=max_chars, max_duration=max_duration, max_words=max_words)
+
+
 def _offset_caption_segments(caption_segments: list[dict], offset: float) -> list[dict]:
     return [
         {
@@ -2137,7 +2189,6 @@ def main():
 
                         for i in range(1, len(ordered_images) + 1):
                             entry = parsed.get(i, {"text": "", "pause": 2.0})
-                            scene_duration = get_scene_duration(text=entry["text"])
                             scene_audio_path = os.path.join(temp_dir, f"voice_scene_{i}.mp3")
                             scene_metadata_path = os.path.join(temp_dir, f"voice_scene_{i}.json")
                             if entry["text"].strip():
@@ -2149,12 +2200,14 @@ def main():
                                 )
                                 clip = AudioFileClip(scene_audio_path)
                                 audio_clips.append(clip)
+                                scene_duration = clip.duration
                                 per_scene_durations.append(scene_duration)
 
                                 word_events = _parse_edge_tts_word_metadata(scene_metadata_path)
-                                segments = _build_caption_segments(word_events)
+                                segments = _build_caption_segments_from_original(word_events, entry["text"])
                                 scene_caption_segments.extend(_offset_caption_segments(segments, sum(per_scene_durations[:-1])))
                             else:
+                                scene_duration = get_scene_duration(text=entry["text"])
                                 per_scene_durations.append(scene_duration)
 
                             pause_seconds = float(entry.get("pause", 2.0))
